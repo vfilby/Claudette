@@ -4,6 +4,9 @@ A macOS menu bar app that tracks actively-running **Claude Code** background ses
 grouped by project folder and by category (Working / Needs input / Completed / Failed),
 with native notifications when a session finishes or needs your attention.
 
+<img width="386" height="603" alt="image" src="https://github.com/user-attachments/assets/ced952fe-3d38-4fd3-ba7e-12cf92bc2d57" />
+
+
 ## How it works
 
 Claudette polls `claude agents --json` on an interval and parses the live session list.
