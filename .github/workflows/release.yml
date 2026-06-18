@@ -123,6 +123,7 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="$SIGN_IDENTITY" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
             OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
             MARKETING_VERSION="${{ steps.ver.outputs.version }}" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
@@ -134,6 +135,12 @@ jobs:
           APP="build/${APP_NAME}.app"
           codesign --verify --deep --strict --verbose=2 "$APP"
           codesign -dvv "$APP" 2>&1 | grep -E 'Authority|TeamIdentifier|flags' || true
+          # The debug entitlement is an automatic notarization rejection — fail
+          # early and clearly if it ever leaks back into a release build.
+          if codesign -d --entitlements - "$APP" 2>/dev/null | grep -q 'get-task-allow'; then
+            echo "::error::Signed app still carries com.apple.security.get-task-allow — notarization would be rejected."
+            exit 1
+          fi
 
       - name: Notarize & staple the app
         env:
@@ -145,11 +152,24 @@ jobs:
           SUBMIT_ZIP="$RUNNER_TEMP/notarize-app.zip"
 
           ditto -c -k --keepParent "$APP" "$SUBMIT_ZIP"
-          xcrun notarytool submit "$SUBMIT_ZIP" \
+
+          # `notarytool submit --wait` exits 0 even when Apple rejects the upload,
+          # so capture the result and inspect the status ourselves — on anything
+          # other than Accepted, dump Apple's per-issue log and fail loudly.
+          RESULT=$(xcrun notarytool submit "$SUBMIT_ZIP" \
             --key "$AC_KEY_PATH" \
             --key-id "$AC_API_KEY_ID" \
             --issuer "$AC_API_ISSUER_ID" \
-            --wait
+            --wait --output-format json)
+          echo "$RESULT"
+          SUBMISSION_ID=$(echo "$RESULT" | plutil -extract id raw -)
+          STATUS=$(echo "$RESULT" | plutil -extract status raw -)
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "::error::Notarization failed with status: $STATUS"
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --key "$AC_KEY_PATH" --key-id "$AC_API_KEY_ID" --issuer "$AC_API_ISSUER_ID" || true
+            exit 1
+          fi
 
           xcrun stapler staple "$APP"
           xcrun stapler validate "$APP"
@@ -182,11 +202,20 @@ jobs:
         run: |
           set -euo pipefail
           DMG="${{ steps.ver.outputs.dmg }}"
-          xcrun notarytool submit "$DMG" \
+          RESULT=$(xcrun notarytool submit "$DMG" \
             --key "$AC_KEY_PATH" \
             --key-id "$AC_API_KEY_ID" \
             --issuer "$AC_API_ISSUER_ID" \
-            --wait
+            --wait --output-format json)
+          echo "$RESULT"
+          SUBMISSION_ID=$(echo "$RESULT" | plutil -extract id raw -)
+          STATUS=$(echo "$RESULT" | plutil -extract status raw -)
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "::error::DMG notarization failed with status: $STATUS"
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --key "$AC_KEY_PATH" --key-id "$AC_API_KEY_ID" --issuer "$AC_API_ISSUER_ID" || true
+            exit 1
+          fi
           xcrun stapler staple "$DMG"
           xcrun stapler validate "$DMG"
 
