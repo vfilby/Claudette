@@ -2,6 +2,9 @@ import SwiftUI
 
 struct MenuContentView: View {
     @ObservedObject var poller: AgentPoller
+    @AppStorage("menuBarIcon") private var iconRaw = MenuBarIcon.robot.rawValue
+
+    private var icon: MenuBarIcon { MenuBarIcon(rawValue: iconRaw) ?? .robot }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -34,7 +37,11 @@ struct MenuContentView: View {
 
     private var header: some View {
         HStack {
-            Image(systemName: "ant.fill")
+            if let emoji = icon.emoji {
+                Text(emoji)
+            } else {
+                Image(systemName: icon.previewSymbol ?? "ant.fill")
+            }
             Text("Claudette").font(.headline)
             Spacer()
             if poller.needsInputCount > 0 {
@@ -54,6 +61,7 @@ struct MenuContentView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
+            iconPicker
             Button { poller.pollNow() } label: { Image(systemName: "arrow.clockwise") }
                 .buttonStyle(.borderless)
                 .help("Refresh now")
@@ -61,6 +69,32 @@ struct MenuContentView: View {
                 .buttonStyle(.borderless)
         }
         .padding(10)
+    }
+
+    private var iconPicker: some View {
+        Menu {
+            Picker("Menu Bar Icon", selection: $iconRaw) {
+                ForEach(MenuBarIcon.allCases) { option in
+                    Label {
+                        Text(option.label)
+                    } icon: {
+                        if let emoji = option.emoji {
+                            Text(emoji)
+                        } else if let symbol = option.previewSymbol {
+                            Image(systemName: symbol)
+                        }
+                    }
+                    .tag(option.rawValue)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Image(systemName: "gearshape")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Choose menu bar icon")
     }
 
     private func errorRow(_ error: String) -> some View {
