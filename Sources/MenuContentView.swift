@@ -2,32 +2,51 @@ import SwiftUI
 
 struct MenuContentView: View {
     @ObservedObject var poller: AgentPoller
+    @ObservedObject var hosts: HostStore
+
+    @State private var managingHosts = false
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if managingHosts {
+                HostsView(poller: poller, hosts: hosts, onClose: { managingHosts = false })
+            } else {
+                sessionList
+            }
+        }
+        .frame(width: 340)
+    }
+
+    // MARK: Session list
+
+    private var sessionList: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Divider()
 
-            if let error = poller.lastError {
-                errorRow(error)
-            } else if poller.sessions.isEmpty {
+            let groups = poller.byHost
+            if groups.isEmpty {
                 emptyRow
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
-                        ForEach(poller.byProject, id: \.project) { group in
-                            ProjectSection(group: group)
+                        ForEach(groups) { group in
+                            HostSection(group: group, showHeader: showHostHeaders)
                         }
                     }
                     .padding(.vertical, 8)
                 }
-                .frame(maxHeight: 420)
+                .frame(maxHeight: 460)
             }
 
             Divider()
             footer
         }
-        .frame(width: 340)
+    }
+
+    /// Show per-host headers only once there's more than the local machine in play.
+    private var showHostHeaders: Bool {
+        hosts.hasRemotes
     }
 
     // MARK: Pieces
@@ -54,6 +73,9 @@ struct MenuContentView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
+            Button { managingHosts = true } label: { Image(systemName: "server.rack") }
+                .buttonStyle(.borderless)
+                .help("Manage remote hosts")
             Button { poller.pollNow() } label: { Image(systemName: "arrow.clockwise") }
                 .buttonStyle(.borderless)
                 .help("Refresh now")
@@ -61,13 +83,6 @@ struct MenuContentView: View {
                 .buttonStyle(.borderless)
         }
         .padding(10)
-    }
-
-    private func errorRow(_ error: String) -> some View {
-        Label(error, systemImage: "exclamationmark.triangle.fill")
-            .font(.callout)
-            .foregroundStyle(.red)
-            .padding(12)
     }
 
     private var emptyRow: some View {
@@ -86,8 +101,41 @@ struct MenuContentView: View {
     }
 }
 
+// MARK: - Host section
+
+private struct HostSection: View {
+    let group: AgentPoller.HostGroup
+    let showHeader: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if showHeader {
+                HStack(spacing: 6) {
+                    Image(systemName: group.isLocal ? "laptopcomputer" : "server.rack")
+                        .font(.caption)
+                    Text(group.label).font(.subheadline.weight(.bold))
+                    Spacer()
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+            }
+
+            if let error = group.error {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 12)
+            }
+
+            ForEach(group.projects) { project in
+                ProjectSection(group: project)
+            }
+        }
+    }
+}
+
 private struct ProjectSection: View {
-    let group: (project: String, name: String, sessions: [AgentSession])
+    let group: AgentPoller.ProjectGroup
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {

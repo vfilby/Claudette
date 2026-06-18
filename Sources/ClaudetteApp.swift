@@ -2,11 +2,18 @@ import SwiftUI
 
 @main
 struct ClaudetteApp: App {
-    @StateObject private var poller = AgentPoller()
+    @StateObject private var hosts: HostStore
+    @StateObject private var poller: AgentPoller
+
+    init() {
+        let store = HostStore()
+        _hosts = StateObject(wrappedValue: store)
+        _poller = StateObject(wrappedValue: AgentPoller(hosts: store))
+    }
 
     var body: some Scene {
         MenuBarExtra {
-            MenuContentView(poller: poller)
+            MenuContentView(poller: poller, hosts: hosts)
                 .onAppear { poller.start() }
         } label: {
             Image(systemName: menuSymbol)

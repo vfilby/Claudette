@@ -2,10 +2,13 @@ import Foundation
 
 /// One background Claude Code session, as emitted by `claude agents --json`.
 ///
-/// Fields mirror the CLI output exactly. `status` and `pid` are present for live
-/// sessions (plain `--json`) but absent from `--json --all`, so both are optional.
+/// Decoded fields mirror the CLI output exactly. `status` and `pid` are present
+/// for live sessions (plain `--json`) but absent from `--json --all`, so both are
+/// optional. `hostID`/`hostLabel` are *not* part of the CLI output — the poller
+/// stamps them after decoding so sessions can be attributed to the machine they
+/// came from.
 struct AgentSession: Codable, Identifiable, Hashable {
-    let id: String
+    let agentID: String
     let sessionId: String
     let cwd: String
     let name: String
@@ -14,6 +17,20 @@ struct AgentSession: Codable, Identifiable, Hashable {
     let state: String              // working | done | failed | stopped | blocked
     let status: String?            // busy | idle  (nil in --all output)
     let pid: Int?
+
+    // Stamped post-decode by the poller; never read from JSON.
+    var hostID: String = Host.localID
+    var hostLabel: String = ""
+
+    /// Only the CLI fields participate in (de)coding; host fields keep their defaults.
+    private enum CodingKeys: String, CodingKey {
+        case agentID = "id"
+        case sessionId, cwd, name, kind, startedAt, state, status, pid
+    }
+
+    /// Globally unique across hosts — two machines can emit the same agent id, so
+    /// the host is folded in for `Identifiable`, notification keys, and grouping.
+    var id: String { hostID == Host.localID ? agentID : "\(hostID)/\(agentID)" }
 
     var startedDate: Date { Date(timeIntervalSince1970: startedAt / 1000.0) }
 

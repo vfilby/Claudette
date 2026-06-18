@@ -11,6 +11,9 @@ It rolls worktree sessions (`<project>/.claude/worktrees/...`) back up under the
 project, sorts attention-needing sessions to the top, and fires a `UserNotifications`
 alert whenever a session transitions to **needs input**, **finished**, or **failed**.
 
+It can monitor the **local Mac and remote hosts over SSH** at the same time — see
+[Remote hosts](#remote-hosts) below.
+
 Data source reference (verified against Claude Code 2.1.179):
 - `claude agents --json` — active sessions: `id, sessionId, cwd, name, kind, startedAt, state, status, pid`
 - `claude agents --json --all` — includes completed (drops `status`/`pid`)
@@ -34,16 +37,54 @@ needed to build and run it locally. On first launch, approve the notification pr
 It runs as a menu bar accessory (`LSUIElement`) — no Dock icon. The menu bar glyph shows
 a count of working + needs-input sessions; click it for the grouped breakdown.
 
+## Remote hosts
+
+Claudette can poll Claude Code sessions running on other machines over **key-based,
+passwordless SSH**. Click the **server icon** in the footer to open *Remote hosts*, then
+**Add remote host** and fill in:
+
+| Field | Notes |
+|-------|-------|
+| **Label** | Optional display name; defaults to `user@host`. |
+| **User** / **Host** | The SSH target (`user@hostname`). |
+| **Port** | Defaults to `22`. |
+| **Key file** | Optional explicit identity file, e.g. `~/.ssh/id_ed25519`. Leave blank to use your SSH defaults / agent. |
+| **Claude path** | Optional. Leave blank and Claudette resolves `claude` through a remote login shell (`bash -lc`). Set it explicitly if `claude` isn't on the remote login PATH. |
+
+Use the **⚡️ test button** on each host to verify connectivity before relying on it.
+Remote sessions appear under a per-host header and their notifications are tagged with
+the host label.
+
+### How it polls
+
+For each enabled host Claudette runs:
+
+```sh
+ssh -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new \
+    [-p PORT] [-i KEYFILE] user@host 'bash -lc "claude agents --json"'
+```
+
+- `BatchMode=yes` means it **never prompts for a password** — set up an SSH key first
+  (`ssh-copy-id user@host`). Password-only hosts will fail fast rather than hang. For a
+  smoother experience, use an `ssh-agent` or `ControlMaster` so auth happens once.
+- `ConnectTimeout` keeps a dead host from stalling the menu; hosts are polled in parallel.
+- `accept-new` trusts a new host key on first connect and pins it thereafter.
+
+Hosts are stored in `UserDefaults` (`com.vfilby.Claudette.hosts`). The local Mac is always
+monitored and can't be removed.
+
 ## Customizing
 
 - **Poll interval** — `AgentPoller.pollInterval` (default 4s).
 - **Which transitions notify** — `AgentPoller.detectTransitions`.
 - **Binary location** — `AgentPoller.resolveClaudeBinary` checks `~/.local/bin`,
   `/opt/homebrew/bin`, `/usr/local/bin`, `~/.claude/local`, then a login shell.
+- **SSH options** — `AgentPoller.sshArguments` (timeout, host-key policy, identity).
 
 ## Ideas / next steps
 
 - Launch at login (`SMAppService`).
-- Click a session to `claude attach <id>` in a new terminal.
+- Click a session to `claude attach <id>` in a new terminal (`ssh -t` for remotes).
 - Read `roster.json` directly to group by agent type, and avoid spawning the CLI.
 - Per-project mute, and a "needs input" sound distinct from "finished".
+- Edit existing remote hosts in place (currently delete + re-add).
