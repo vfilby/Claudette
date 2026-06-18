@@ -1,11 +1,20 @@
 # Claudette
 
+[![CI](https://github.com/vfilby/Claudette/actions/workflows/ci.yml/badge.svg)](https://github.com/vfilby/Claudette/actions/workflows/ci.yml)
+
 A macOS menu bar app that tracks actively-running **Claude Code** background sessions,
 grouped by project folder and by category (Working / Needs input / Completed / Failed),
 with native notifications when a session finishes or needs your attention.
 
 <img width="386" height="603" alt="image" src="https://github.com/user-attachments/assets/ced952fe-3d38-4fd3-ba7e-12cf92bc2d57" />
 
+## Download
+
+Grab the latest signed & notarized build from the
+[**Releases**](https://github.com/vfilby/Claudette/releases) page (`.dmg` or `.zip`).
+Builds are signed with a Developer ID and notarized by Apple, so they open without
+Gatekeeper warnings. Releasing is automated — see
+[`.github/RELEASE_SETUP.md`](.github/RELEASE_SETUP.md).
 
 ## How it works
 

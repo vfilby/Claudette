@@ -1,0 +1,44 @@
+name: CI
+
+# Fast feedback on every push and PR: regenerate the project from project.yml
+# and do a Release build. No code-signing secrets are involved here — the build
+# uses the repo's ad-hoc identity (CODE_SIGN_IDENTITY = "-"), exactly like a
+# local `xcodebuild` checkout. Signing/notarization happen only in release.yml.
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (ad-hoc signed)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Claudette.xcodeproj \
+            -scheme Claudette \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=YES \
+            build
