@@ -189,6 +189,21 @@ final class AgentPoller: ObservableObject {
             proc.arguments = sshArguments(for: host)
         }
 
+        // Drain stdout/stderr on background threads (so a full pipe buffer can't wedge
+        // the child) and bound the whole call with a wall-clock timeout. Without this a
+        // single hung `claude`/`ssh` makes `waitUntilExit` block forever: the poll's
+        // `polling` flag never clears, every later poll no-ops at `beginPoll`, and the
+        // menu silently freezes at its last `Updated` time. The timeout is the backstop
+        // that keeps one bad host from killing all polling.
+        var outData = Data()
+        var errData = Data()
+        let io = DispatchGroup()
+        let drain = DispatchQueue.global(qos: .utility)
+        io.enter(); drain.async { outData = out.fileHandleForReading.readDataToEndOfFile(); io.leave() }
+        io.enter(); drain.async { errData = err.fileHandleForReading.readDataToEndOfFile(); io.leave() }
+
+        let done = DispatchSemaphore(value: 0)
+        proc.terminationHandler = { _ in done.signal() }
         do {
             try proc.run()
         } catch {
@@ -196,11 +211,24 @@ final class AgentPoller: ObservableObject {
             return .fail("Failed to launch \(what): \(error.localizedDescription)")
         }
 
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        proc.waitUntilExit()
+        // SSH self-bounds its connect (ConnectTimeout) and dead connections
+        // (ServerAlive*), but the remote command can still stall — allow headroom, then
+        // escalate SIGTERM -> SIGKILL so the process can't outlive its budget.
+        let budget: DispatchTimeInterval = .seconds(host.kind == .ssh ? 20 : 12)
+        if done.wait(timeout: .now() + budget) == .timedOut {
+            proc.terminate()
+            if done.wait(timeout: .now() + 2) == .timedOut {
+                kill(proc.processIdentifier, SIGKILL)
+                done.wait()
+            }
+            let what = host.kind == .ssh ? "the remote host" : "claude"
+            return .fail("Timed out — \(what) didn’t respond.")
+        }
+        io.wait()
+        let data = outData
 
         guard proc.terminationStatus == 0 else {
-            let raw = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+            let raw = String(data: errData, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             return .fail(friendlyError(raw, status: proc.terminationStatus, kind: host.kind))
         }
@@ -224,6 +252,8 @@ final class AgentPoller: ObservableObject {
             "-o", "BatchMode=yes",                    // never prompt — key-based auth only
             "-o", "ConnectTimeout=8",                 // fail fast on an unreachable host
             "-o", "StrictHostKeyChecking=accept-new", // trust-on-first-use, pin thereafter
+            "-o", "ServerAliveInterval=5",            // probe a connected-but-silent link…
+            "-o", "ServerAliveCountMax=2",            // …and drop it after ~10s, not forever
         ]
         if host.port != 22 {
             args += ["-p", String(host.port)]
@@ -303,13 +333,13 @@ final class AgentPoller: ObservableObject {
             switch new {
             case .needsInput:
                 notifier.notify(title: "Claude needs input",
-                                body: "\(hostTag)\(s.projectName): \(s.name)", id: s.id, cwd: s.projectPath)
+                                body: "\(hostTag)\(s.projectName): \(s.name)", id: s.id, cwd: s.projectPath, hostID: s.hostID)
             case .done where old == .working:
                 notifier.notify(title: "✅ Session finished",
-                                body: "\(hostTag)\(s.projectName): \(s.name)", id: s.id, cwd: s.projectPath)
+                                body: "\(hostTag)\(s.projectName): \(s.name)", id: s.id, cwd: s.projectPath, hostID: s.hostID)
             case .failed:
                 notifier.notify(title: "❌ Session failed",
-                                body: "\(hostTag)\(s.projectName): \(s.name)", id: s.id, cwd: s.projectPath)
+                                body: "\(hostTag)\(s.projectName): \(s.name)", id: s.id, cwd: s.projectPath, hostID: s.hostID)
             default:
                 break
             }
