@@ -1,3 +1,6 @@
+# Claude Code worktrees (ephemeral; never committed)
+.claude/worktrees/
+
 # Xcode / build
 build/
 DerivedData/
