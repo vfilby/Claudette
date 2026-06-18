@@ -39,7 +39,7 @@ struct MenuContentView: View {
                     }
                     .padding(.vertical, 8)
                 }
-                .frame(maxHeight: 460)
+                .frame(height: listHeight)
             }
 
             Divider()
@@ -50,6 +50,34 @@ struct MenuContentView: View {
     /// Show per-host headers only once there's more than the local machine in play.
     private var showHostHeaders: Bool {
         hosts.hasRemotes
+    }
+
+    /// Explicit, content-adaptive height for the session list. Inside a
+    /// fit-to-content `MenuBarExtra` window a bare `ScrollView` collapses to a
+    /// tiny intrinsic height, hiding most sessions; sizing it ourselves up to a
+    /// cap keeps every session visible until the list is genuinely long.
+    private var listHeight: CGFloat {
+        let hostHeader: CGFloat = 24       // per-host header (shown only with remotes)
+        let groupHeader: CGFloat = 28      // folder row
+        let sessionRow: CGFloat = 44       // one session
+        let groupSpacing: CGFloat = 12     // VStack spacing between groups
+        let verticalPadding: CGFloat = 16  // .padding(.vertical, 8) top+bottom
+
+        let groups = poller.byHost
+        let projectCount = groups.reduce(0) { $0 + $1.projects.count }
+        let sessionCount = groups.reduce(0) { sum, host in
+            sum + host.projects.reduce(0) { $0 + $1.sessions.count }
+        }
+
+        var content = verticalPadding
+        content += CGFloat(projectCount) * groupHeader
+        content += CGFloat(sessionCount) * sessionRow
+        content += CGFloat(max(0, groups.count - 1)) * groupSpacing
+        if showHostHeaders {
+            content += CGFloat(groups.count) * hostHeader
+        }
+
+        return min(max(content, 60), 480)
     }
 
     // MARK: Pieces
