@@ -133,13 +133,13 @@ final class AgentPoller: ObservableObject {
             switch new {
             case .needsInput:
                 notifier.notify(title: "Claude needs input",
-                                body: "\(s.projectName): \(s.name)", id: s.id)
+                                body: "\(s.projectName): \(s.name)", id: s.id, cwd: s.projectPath)
             case .done where old == .working:
                 notifier.notify(title: "✅ Session finished",
-                                body: "\(s.projectName): \(s.name)", id: s.id)
+                                body: "\(s.projectName): \(s.name)", id: s.id, cwd: s.projectPath)
             case .failed:
                 notifier.notify(title: "❌ Session failed",
-                                body: "\(s.projectName): \(s.name)", id: s.id)
+                                body: "\(s.projectName): \(s.name)", id: s.id, cwd: s.projectPath)
             default:
                 break
             }

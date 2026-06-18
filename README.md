@@ -34,16 +34,30 @@ needed to build and run it locally. On first launch, approve the notification pr
 It runs as a menu bar accessory (`LSUIElement`) — no Dock icon. The menu bar glyph shows
 a count of working + needs-input sessions; click it for the grouped breakdown.
 
+## Opening a session
+
+Click any session row — or click the notification it fired — to open Claude Code's
+interactive **agent view** (`claude agents --cwd <project>`) in a terminal, filtered to
+that session's project. Background agents are daemon workers with no foreground TTY, so
+there's no pane to "switch" to and `claude --resume <id>` refuses them; the agent view is
+the canonical place to read output and reattach (`SessionLauncher.swift`).
+
+The terminal is selectable from the window picker (the `macwindow` button in the footer):
+Ghostty, iTerm, Terminal, kitty, WezTerm, Alacritty are launched directly; **Automatic**
+picks the first installed; **System default** writes an executable `.command` file and
+lets the OS open it, so any other terminal works as your default handler.
+
 ## Customizing
 
 - **Poll interval** — `AgentPoller.pollInterval` (default 4s).
 - **Which transitions notify** — `AgentPoller.detectTransitions`.
+- **Terminal to open sessions in** — the footer picker, persisted as the `terminalApp`
+  default; add a new terminal by giving it a `bundleID` + launch strategy in `TerminalApp`.
 - **Binary location** — `AgentPoller.resolveClaudeBinary` checks `~/.local/bin`,
   `/opt/homebrew/bin`, `/usr/local/bin`, `~/.claude/local`, then a login shell.
 
 ## Ideas / next steps
 
 - Launch at login (`SMAppService`).
-- Click a session to `claude attach <id>` in a new terminal.
 - Read `roster.json` directly to group by agent type, and avoid spawning the CLI.
 - Per-project mute, and a "needs input" sound distinct from "finished".

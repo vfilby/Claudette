@@ -48,12 +48,13 @@ struct MenuContentView: View {
     }
 
     private var footer: some View {
-        HStack {
+        HStack(spacing: 8) {
             if let updated = poller.lastUpdated {
                 Text("Updated \(updated, style: .time)")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
+            TerminalPicker()
             Button { poller.pollNow() } label: { Image(systemName: "arrow.clockwise") }
                 .buttonStyle(.borderless)
                 .help("Refresh now")
@@ -86,6 +87,31 @@ struct MenuContentView: View {
     }
 }
 
+/// Lets the user choose which terminal `Open in agent view` launches.
+private struct TerminalPicker: View {
+    @AppStorage("terminalApp") private var terminalApp: String = TerminalApp.auto.rawValue
+
+    var body: some View {
+        Menu {
+            ForEach(TerminalApp.selectable) { term in
+                Button {
+                    terminalApp = term.rawValue
+                } label: {
+                    HStack {
+                        Text(term.displayName)
+                        if term.rawValue == terminalApp { Image(systemName: "checkmark") }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "macwindow")
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("Open sessions in: \(TerminalApp(rawValue: terminalApp)?.displayName ?? "Automatic")")
+    }
+}
+
 private struct ProjectSection: View {
     let group: (project: String, name: String, sessions: [AgentSession])
 
@@ -107,30 +133,42 @@ private struct ProjectSection: View {
 
 private struct SessionRow: View {
     let session: AgentSession
+    @State private var hovering = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: session.category.symbol)
-                .foregroundStyle(color)
-                .frame(width: 16)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(session.name)
-                    .font(.callout)
-                    .lineLimit(2)
-                HStack(spacing: 6) {
-                    Text(session.category.rawValue)
-                    if session.isWorktree {
-                        Text("· worktree")
+        Button { SessionLauncher.open(cwd: session.projectPath) } label: {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: session.category.symbol)
+                    .foregroundStyle(color)
+                    .frame(width: 16)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(session.name)
+                        .font(.callout)
+                        .lineLimit(2)
+                    HStack(spacing: 6) {
+                        Text(session.category.rawValue)
+                        if session.isWorktree {
+                            Text("· worktree")
+                        }
+                        Text("· \(session.startedDate, style: .relative)")
                     }
-                    Text("· \(session.startedDate, style: .relative)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                 }
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                Spacer()
+                Image(systemName: "arrow.up.forward.app")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .opacity(hovering ? 1 : 0)
             }
-            Spacer()
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 3)
+        .buttonStyle(.plain)
+        .background(hovering ? Color.primary.opacity(0.08) : Color.clear)
+        .onHover { hovering = $0 }
+        .help("Open this session in the agent view")
     }
 
     private var color: Color {
