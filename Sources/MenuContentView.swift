@@ -21,13 +21,33 @@ struct MenuContentView: View {
                     }
                     .padding(.vertical, 8)
                 }
-                .frame(maxHeight: 420)
+                .frame(height: listHeight)
             }
 
             Divider()
             footer
         }
         .frame(width: 340)
+    }
+
+    /// Explicit, content-adaptive height for the session list. Inside a
+    /// fit-to-content `MenuBarExtra` window a bare `ScrollView` collapses to a
+    /// tiny intrinsic height, hiding most sessions; sizing it ourselves up to a
+    /// cap keeps every session visible until the list is genuinely long.
+    private var listHeight: CGFloat {
+        let groupHeader: CGFloat = 28      // folder row
+        let sessionRow: CGFloat = 44       // one session
+        let groupSpacing: CGFloat = 12     // VStack spacing between groups
+        let verticalPadding: CGFloat = 16  // .padding(.vertical, 8) top+bottom
+
+        let groups = poller.byProject
+        let sessionCount = groups.reduce(0) { $0 + $1.sessions.count }
+        let content = CGFloat(groups.count) * groupHeader
+            + CGFloat(sessionCount) * sessionRow
+            + CGFloat(max(0, groups.count - 1)) * groupSpacing
+            + verticalPadding
+
+        return min(max(content, 60), 480)
     }
 
     // MARK: Pieces
