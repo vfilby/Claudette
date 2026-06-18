@@ -11,8 +11,9 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     private var authorized = false
     private var available: Bool { Bundle.main.bundleIdentifier != nil }
 
-    /// userInfo key carrying the session's working directory for click handling.
+    /// userInfo keys carrying the session's working directory and host for click handling.
     private static let cwdKey = "cwd"
+    private static let hostKey = "hostID"
 
     func requestAuthorization() {
         guard available else { return }
@@ -23,7 +24,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    func notify(title: String, body: String, id: String, cwd: String) {
+    func notify(title: String, body: String, id: String, cwd: String, hostID: String) {
         guard available else {
             print("[Claudette] \(title) — \(body)")
             return
@@ -32,7 +33,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         content.title = title
         content.body = body
         content.sound = .default
-        content.userInfo = [Self.cwdKey: cwd]
+        content.userInfo = [Self.cwdKey: cwd, Self.hostKey: hostID]
 
         // Unique request per transition so repeats aren't coalesced away.
         let request = UNNotificationRequest(
@@ -49,8 +50,10 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
-        if let cwd = response.notification.request.content.userInfo[Self.cwdKey] as? String {
-            DispatchQueue.main.async { SessionLauncher.open(cwd: cwd) }
+        let info = response.notification.request.content.userInfo
+        if let cwd = info[Self.cwdKey] as? String {
+            let hostID = info[Self.hostKey] as? String ?? Host.localID
+            DispatchQueue.main.async { SessionLauncher.open(cwd: cwd, hostID: hostID) }
         }
         completionHandler()
     }

@@ -10,6 +10,9 @@ struct ClaudetteApp: App {
         let store = HostStore()
         _hosts = StateObject(wrappedValue: store)
         _poller = StateObject(wrappedValue: AgentPoller(hosts: store))
+        // Let the launcher resolve a session's host so remote sessions open over SSH
+        // instead of falling back to a local shell.
+        SessionLauncher.hostResolver = { [weak store] id in store?.host(id: id) }
     }
 
     private var icon: MenuBarIcon { MenuBarIcon(rawValue: iconRaw) ?? .robot }

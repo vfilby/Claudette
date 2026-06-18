@@ -253,7 +253,7 @@ private struct SessionRow: View {
     @State private var hovering = false
 
     var body: some View {
-        Button { SessionLauncher.open(cwd: session.projectPath) } label: {
+        Button { SessionLauncher.open(cwd: session.projectPath, hostID: session.hostID) } label: {
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: session.category.symbol)
                     .foregroundStyle(color)

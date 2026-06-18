@@ -16,6 +16,9 @@ final class HostStore: ObservableObject {
     /// Hosts that should actually be polled (local is always enabled).
     var activeHosts: [Host] { allHosts.filter { $0.enabled } }
 
+    /// Looks up a host (local or remote) by its stable id.
+    func host(id: String) -> Host? { allHosts.first { $0.id == id } }
+
     /// True once at least one remote host is configured — used to decide whether
     /// the menu should show per-host headers.
     var hasRemotes: Bool { !remotes.isEmpty }

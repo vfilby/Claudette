@@ -12,18 +12,72 @@ import AppKit
 /// `--cwd` matches by *project root* and rolls worktree sessions up under their parent,
 /// so callers pass `AgentSession.projectPath` (not the raw worktree `cwd`, which `--cwd`
 /// would not match).
+///
+/// A session lives on a *host*: the local Mac runs `claude` directly; a remote SSH host
+/// needs the terminal to first `ssh` in and run `claude` there. `hostResolver` maps a
+/// session's `hostID` to its `Host` so both the menu and notification-click paths reach
+/// the right machine — without it (the default), everything is treated as local, which is
+/// exactly the bug where a remote session opened a shell on the local box instead.
 enum SessionLauncher {
 
-    /// Opens the agent view filtered to `cwd` (a project root path) in the
-    /// user's preferred terminal.
-    static func open(cwd: String) {
-        guard let bin = AgentPoller.resolveClaudeBinary() else {
-            NSSound.beep()
-            return
+    /// Resolves a session's `hostID` to its `Host`. Wired up once at app startup
+    /// (see `ClaudetteApp`); defaults to "everything is local" if never set.
+    static var hostResolver: (String) -> Host? = { _ in nil }
+
+    /// Opens the agent view filtered to `cwd` (a project root path) for the session's
+    /// host, in the user's preferred terminal. Local hosts run `claude` directly; SSH
+    /// hosts are reached by `ssh`-ing into the remote and running it there.
+    static func open(cwd: String, hostID: String) {
+        let host = hostResolver(hostID) ?? .local
+        switch host.kind {
+        case .local:
+            guard let bin = AgentPoller.resolveClaudeBinary() else {
+                NSSound.beep()
+                return
+            }
+            // `exec` so the window's lifetime tracks the agent view, not a lingering shell.
+            let command = "cd \(shellQuote(cwd)) && exec \(shellQuote(bin)) agents --cwd \(shellQuote(cwd))"
+            TerminalApp.current.run(shellCommand: command)
+        case .ssh:
+            guard !host.hostname.isEmpty else {
+                NSSound.beep()
+                return
+            }
+            TerminalApp.current.run(shellCommand: sshCommand(for: host, cwd: cwd))
         }
-        // `exec` so the window's lifetime tracks the agent view, not a lingering shell.
-        let command = "cd \(shellQuote(cwd)) && exec \(shellQuote(bin)) agents --cwd \(shellQuote(cwd))"
-        TerminalApp.current.run(shellCommand: command)
+    }
+
+    // MARK: SSH command construction
+
+    /// Builds the local shell command that `ssh`-es into `host` and opens the agent
+    /// view there. Mirrors `AgentPoller`'s remote command, but interactive: a TTY is
+    /// forced (`-t`) for the agent UI, and `BatchMode` is *omitted* so key/agent auth
+    /// and any host-key prompt can proceed in the terminal.
+    private static func sshCommand(for host: Host, cwd: String) -> String {
+        var ssh = "ssh -t -o StrictHostKeyChecking=accept-new"
+        if host.port != 22 {
+            ssh += " -p \(host.port)"
+        }
+        if !host.identityFile.isEmpty {
+            ssh += " -i \(shellQuote((host.identityFile as NSString).expandingTildeInPath))"
+        }
+        let target = host.user.isEmpty ? host.hostname : "\(host.user)@\(host.hostname)"
+        ssh += " \(shellQuote(target))"
+        ssh += " \(shellQuote(remoteAgentCommand(for: host, cwd: cwd)))"
+        return ssh
+    }
+
+    /// The command run on the remote. With an explicit path we invoke it directly;
+    /// otherwise we go through a login shell so the remote user's PATH applies
+    /// (ssh runs commands via a non-login shell, which often omits `claude`).
+    /// `exec` so the ssh session's lifetime tracks the agent view itself.
+    private static func remoteAgentCommand(for host: Host, cwd: String) -> String {
+        let q = shellQuote(cwd)
+        if !host.remoteClaudePath.isEmpty {
+            return "cd \(q) && exec \(shellQuote(host.remoteClaudePath)) agents --cwd \(q)"
+        }
+        let inner = "cd \(q) && exec claude agents --cwd \(q)"
+        return "bash -lc \(shellQuote(inner))"
     }
 
     // MARK: Escaping

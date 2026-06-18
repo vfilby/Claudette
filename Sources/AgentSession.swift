@@ -28,6 +28,24 @@ struct AgentSession: Codable, Identifiable, Hashable {
         case sessionId, cwd, name, kind, startedAt, state, status, pid
     }
 
+    /// Interactive sessions are shaped differently from background agents: they're
+    /// keyed by `pid` (no `id`), and carry no `name`/`state` — only a `status`.
+    /// Decode defensively so one interactive entry can't fail the whole list:
+    /// fall back to `pid`/`sessionId` for the id and default the missing fields.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sessionId = try c.decode(String.self, forKey: .sessionId)
+        cwd       = try c.decode(String.self, forKey: .cwd)
+        kind      = try c.decode(String.self, forKey: .kind)
+        startedAt = try c.decode(Double.self, forKey: .startedAt)
+        status    = try c.decodeIfPresent(String.self, forKey: .status)
+        pid       = try c.decodeIfPresent(Int.self, forKey: .pid)
+        name      = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        state     = try c.decodeIfPresent(String.self, forKey: .state) ?? ""
+        agentID   = try c.decodeIfPresent(String.self, forKey: .agentID)
+                    ?? pid.map(String.init) ?? sessionId
+    }
+
     /// Globally unique across hosts — two machines can emit the same agent id, so
     /// the host is folded in for `Identifiable`, notification keys, and grouping.
     var id: String { hostID == Host.localID ? agentID : "\(hostID)/\(agentID)" }
