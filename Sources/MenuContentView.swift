@@ -3,9 +3,13 @@ import SwiftUI
 struct MenuContentView: View {
     @ObservedObject var poller: AgentPoller
     @ObservedObject var hosts: HostStore
+    @ObservedObject var updates: UpdateChecker
 
     @State private var managingHosts = false
     @AppStorage("menuBarIcon") private var iconRaw = MenuBarIcon.robot.rawValue
+    /// Last update version the user dismissed, so a known update stops nagging until
+    /// a newer one ships.
+    @AppStorage("dismissedUpdateVersion") private var dismissedUpdateVersion = ""
 
     private var icon: MenuBarIcon { MenuBarIcon(rawValue: iconRaw) ?? .robot }
 
@@ -26,6 +30,7 @@ struct MenuContentView: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Divider()
+            updateBanner
 
             let groups = poller.byHost
             if groups.isEmpty {
@@ -99,6 +104,36 @@ struct MenuContentView: View {
             }
         }
         .padding(10)
+    }
+
+    /// Quiet "update available" strip shown below the header when GitHub Releases has
+    /// a newer build. Dismissible per-version; offers a direct download link, no popup.
+    @ViewBuilder
+    private var updateBanner: some View {
+        if let update = updates.available, update.version != dismissedUpdateVersion {
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .foregroundStyle(.blue)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Update available").font(.caption.weight(.semibold))
+                        Text("v\(update.version) · you have v\(updates.currentVersion)")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Link("Download", destination: update.url)
+                        .font(.caption.weight(.semibold))
+                    Button { dismissedUpdateVersion = update.version } label: {
+                        Image(systemName: "xmark").font(.caption2)
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Dismiss until the next release")
+                }
+                .padding(.horizontal, 10).padding(.vertical, 8)
+                .background(Color.blue.opacity(0.10))
+                Divider()
+            }
+        }
     }
 
     private var footer: some View {

@@ -4,6 +4,7 @@ import SwiftUI
 struct ClaudetteApp: App {
     @StateObject private var hosts: HostStore
     @StateObject private var poller: AgentPoller
+    @StateObject private var updates = UpdateChecker()
     @AppStorage("menuBarIcon") private var iconRaw = MenuBarIcon.robot.rawValue
 
     init() {
@@ -19,8 +20,11 @@ struct ClaudetteApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuContentView(poller: poller, hosts: hosts)
-                .onAppear { poller.start() }
+            MenuContentView(poller: poller, hosts: hosts, updates: updates)
+                .onAppear {
+                    poller.start()
+                    updates.start()
+                }
         } label: {
             label
             if poller.workingCount + poller.needsInputCount > 0 {
