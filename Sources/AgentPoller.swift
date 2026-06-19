@@ -276,9 +276,24 @@ final class AgentPoller: ObservableObject {
         return "bash -lc 'claude agents --json'"
     }
 
+    /// Minimum Claude Code version that understands `agents --json`.
+    static let minClaudeVersion = "2.1.139"
+
     /// Translates common SSH/remote failures into something actionable.
     private static func friendlyError(_ raw: String?, status: Int32, kind: Host.Kind) -> String {
         let message = (raw?.isEmpty == false) ? raw! : "exited with status \(status)"
+
+        // Older Claude Code builds lack `agents --json`; the CLI rejects the flag or
+        // the subcommand outright. Surface the version requirement instead of leaking
+        // the raw "unknown option '--json'" / "unknown command 'agents'" text.
+        let lowerMsg = message.lowercased()
+        if (lowerMsg.contains("--json") || lowerMsg.contains("agents"))
+            && (lowerMsg.contains("unknown option") || lowerMsg.contains("unknown command")
+                || lowerMsg.contains("not a valid") || lowerMsg.contains("invalid argument")
+                || lowerMsg.contains("unknown argument")) {
+            return "Claude Code \(minClaudeVersion)+ required for `agents --json` — please update the CLI."
+        }
+
         guard kind == .ssh else { return message }
 
         let lower = message.lowercased()
