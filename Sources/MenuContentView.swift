@@ -95,6 +95,9 @@ struct MenuContentView: View {
                 Image(systemName: icon.previewSymbol ?? "ant.fill")
             }
             Text("Claudette").font(.headline)
+            Text("v\(updates.currentVersion)")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
             Spacer()
             if poller.needsInputCount > 0 {
                 pill("\(poller.needsInputCount) need input", color: .orange)
