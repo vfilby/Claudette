@@ -19,9 +19,6 @@ with native notifications when a session finishes or needs your attention.
 
 Grab the latest signed & notarized build from the
 [**Releases**](https://github.com/vfilby/Claudette/releases) page (`.dmg` or `.zip`).
-Builds are signed with a Developer ID and notarized by Apple, so they open without
-Gatekeeper warnings. Releasing is automated — see
-[`.github/RELEASE_SETUP.md`](.github/RELEASE_SETUP.md).
 
 ## How it works
 
