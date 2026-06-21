@@ -6,12 +6,14 @@ A macOS menu bar app that tracks actively-running **Claude Code** background ses
 grouped by project folder and by category (Working / Needs input / Completed / Failed),
 with native notifications when a session finishes or needs your attention.
 
-<img width="386" height="603" alt="image" src="https://github.com/user-attachments/assets/ced952fe-3d38-4fd3-ba7e-12cf92bc2d57" />
 
 > [!IMPORTANT]
 > Claudette relies on Claude Code's **Agent View** preview feature, which exposes the
 > `claude agents` command it polls. You must have Agent View enabled in Claude Code for
 > Claudette to detect any sessions — without it, the menu bar will always read empty.
+
+<img width="386" height="603" alt="image" src="https://github.com/user-attachments/assets/ced952fe-3d38-4fd3-ba7e-12cf92bc2d57" />
+
 
 ## Download
 
