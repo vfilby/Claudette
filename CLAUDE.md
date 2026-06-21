@@ -22,12 +22,21 @@ Notes:
   `xcodegen generate`; no manual project edits needed.
 - `.xcodeproj`, `build/`, and `DerivedData/` are gitignored — never commit them.
 
-## Worktrees — a feature is NOT done until it's merged back to `master`
+## `master` is protected — everything lands via a squash-merged PR
+
+`master` is guarded by a branch ruleset: no direct pushes, linear history
+required, and the CI check **`Build (ad-hoc signed)`** must pass before merge.
+**Squash is the only allowed merge method** (merge commits and rebase merges are
+disabled at the repo level), so every feature reaches `master` as a single
+commit through a pull request — never via `git merge` + push.
+
+## Worktrees — a feature is NOT done until its PR is merged to `master`
 
 Features are developed in git worktrees under `.claude/worktrees/`. A worktree is
-**only complete once its work is committed AND merged back into `master`** — and
-then the worktree and its branch are removed. Leaving work sitting uncommitted or
-on an unmerged branch is how features get silently lost when the next one starts.
+**only complete once its work is committed, pushed, and its PR is squash-merged
+into `master`** — and then the worktree and its branch are removed. Leaving work
+sitting uncommitted or on an unmerged branch is how features get silently lost
+when the next one starts.
 
 Closing out a worktree feature, every time:
 
@@ -36,13 +45,16 @@ Closing out a worktree feature, every time:
 git -C .claude/worktrees/<name> add -A
 git -C .claude/worktrees/<name> commit -m "feat: <summary>"
 
-# 2. From the main checkout on master: merge it in and resolve conflicts
-git checkout master
-git merge worktree-<name>
+# 2. Push the branch and open a PR
+git -C .claude/worktrees/<name> push -u origin worktree-<name>
+gh pr create --fill --head worktree-<name> --base master
 
-# 3. Rebuild + relaunch (see above), confirm it works
+# 3. Enable auto-merge (squash). It merges once `Build (ad-hoc signed)` is green.
+gh pr merge --auto --squash <pr-number>
 
-# 4. Collapse: remove the now-merged worktree and delete its branch
+# 4. After the PR merges: sync master, rebuild + relaunch (see above), confirm
+
+# 5. Collapse: remove the now-merged worktree and delete its branch
 git worktree remove .claude/worktrees/<name>
 git branch -d worktree-<name>
 ```

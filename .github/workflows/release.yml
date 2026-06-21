@@ -40,7 +40,7 @@ jobs:
       APP_NAME: Claudette
       AC_KEY_PATH: ${{ github.workspace }}/.ci-secrets/ac_api_key.p8
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Resolve version from tag
         id: ver

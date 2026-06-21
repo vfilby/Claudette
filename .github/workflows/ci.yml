@@ -4,6 +4,13 @@ name: CI
 # and do a Release build. No code-signing secrets are involved here — the build
 # uses the repo's ad-hoc identity (CODE_SIGN_IDENTITY = "-"), exactly like a
 # local `xcodebuild` checkout. Signing/notarization happen only in release.yml.
+#
+# The Xcode build only runs when source actually changes (see the `changes`
+# filter below). Doc-only changes (README, CLAUDE.md, .claude/, dependabot, …)
+# skip the expensive build steps. We deliberately do NOT filter at the `on:`
+# level: this job's name is a required status check, and a workflow skipped by
+# top-level path filtering never reports its check, leaving PRs stuck pending.
+# Keeping the job running (and skipping its heavy steps) keeps the check green.
 
 on:
   push:
@@ -20,20 +27,38 @@ jobs:
     name: Build (ad-hoc signed)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+
+      - name: Detect source changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            code:
+              - 'Sources/**'
+              - 'project.yml'
+              - '.github/workflows/ci.yml'
+
+      - name: Skip notice (no source changes)
+        if: steps.changes.outputs.code != 'true'
+        run: echo "No source changes — skipping the Xcode build."
 
       - name: Select Xcode
+        if: steps.changes.outputs.code == 'true'
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
 
       - name: Install XcodeGen
+        if: steps.changes.outputs.code == 'true'
         run: brew install xcodegen
 
       - name: Generate Xcode project
+        if: steps.changes.outputs.code == 'true'
         run: xcodegen generate
 
       - name: Build
+        if: steps.changes.outputs.code == 'true'
         run: |
           set -o pipefail
           xcodebuild \
