@@ -3,9 +3,9 @@ name: Release
 # Produces a fully signed + notarized + stapled Claudette.app, packaged as both
 # a .zip and a .dmg, and attaches them to a GitHub Release.
 #
-# Trigger by pushing a version tag, e.g.:
-#     git tag v0.2.0 && git push origin v0.2.0
-# or run manually from the Actions tab (workflow_dispatch) supplying the tag.
+# Releases are MANUAL ONLY. Run from the Actions tab (workflow_dispatch) and
+# supply the version tag, e.g. v0.2.0. Pushing a tag does NOT trigger a release;
+# the workflow itself creates the GitHub Release (and its tag) from the input.
 #
 # Required repository secrets (see .github/RELEASE_SETUP.md):
 #   BUILD_CERTIFICATE_BASE64  base64 of the "Developer ID Application" .p12
@@ -17,8 +17,6 @@ name: Release
 #   AC_API_KEY_BASE64         base64 of the App Store Connect API key (.p8)
 
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:

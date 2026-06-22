@@ -10,7 +10,8 @@ There are two credentials Apple requires:
 2. An **App Store Connect API key** — to *notarize* it with Apple.
 
 Both require membership in the [Apple Developer Program](https://developer.apple.com/programs/)
-($99/yr). Once you have them, releasing is just `git push origin v0.2.0`.
+($99/yr). Once you have them, releasing is a manual run of the **Release**
+workflow from the Actions tab (see "Cut a release" below).
 
 ---
 
@@ -73,14 +74,20 @@ gh secret set AC_API_ISSUER_ID
 
 ## 4. Cut a release
 
+Releases are **manual**. Pushing a tag does *not* trigger anything — start the
+run yourself from the **Actions** tab and supply the version tag:
+
+- **Actions → Release → Run workflow**, enter the tag (e.g. `v0.2.0`), Run.
+
+or from the CLI:
+
 ```sh
-git tag v0.2.0
-git push origin v0.2.0
+gh workflow run release.yml -f tag=v0.2.0
 ```
 
 The workflow builds, signs, notarizes, staples, packages a `.zip` and `.dmg`,
-and publishes them to a GitHub Release. You can also run it manually from the
-**Actions** tab (provide the tag) once the secrets exist.
+and publishes them to a GitHub Release (creating the `v0.2.0` tag from the
+input). Requires the secrets above to be set.
 
 ## Verifying a downloaded build
 
